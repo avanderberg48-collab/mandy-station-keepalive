@@ -1,0 +1,31 @@
+name: station-watch
+
+on:
+  schedule:
+    - cron: "5 0,6,12,18 * * *"
+  workflow_dispatch:
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Watch the station for five and a half hours
+        env:
+          MANDY_PAT: ${{ secrets.MANDY_PAT }}
+        run: |
+          set +e
+          end=$((SECONDS + 19800))
+          while [ $SECONDS -lt $end ]; do
+            out=$(python3 check_station.py)
+            echo "$(date -u +%H:%M) $out"
+            songs=$(printf '%s\n' "$out" | grep '^songs=' | cut -d= -f2)
+            if [ -z "$songs" ] || [ "$songs" -lt 50 ]; then
+              echo "healing now"
+              python3 trigger_heal.py
+              sleep 300
+            fi
+            sleep 900
+          done
