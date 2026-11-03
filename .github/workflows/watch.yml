@@ -27,5 +27,5 @@ jobs:
               python3 trigger_heal.py
               sleep 300
             fi
-            sleep 900
+            sleep 300
           done
