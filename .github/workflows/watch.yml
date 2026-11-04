@@ -2,8 +2,16 @@ name: station-watch
 
 on:
   schedule:
-    - cron: "5 0,6,12,18 * * *"
+    - cron: "0 0,6,12,18 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: station-watch
+  cancel-in-progress: false
 
 jobs:
   watch:
@@ -12,12 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Watch the station for five and a half hours
+      - name: Watch the station
         env:
           MANDY_PAT: ${{ secrets.MANDY_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set +e
-          end=$((SECONDS + 19800))
+          end=$((SECONDS + 18900))
           while [ $SECONDS -lt $end ]; do
             out=$(python3 check_station.py)
             echo "$(date -u +%H:%M) $out"
@@ -25,7 +34,19 @@ jobs:
             if [ -z "$songs" ] || [ "$songs" -lt 50 ]; then
               echo "healing now"
               python3 trigger_heal.py
-              sleep 300
+              sleep 240
             fi
-            sleep 300
+            sleep 240
           done
+
+      - name: Hand over to the next watcher
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/watch.yml/dispatches" \
+            -d '{"ref":"main"}'
+          echo "next watcher asked for"
